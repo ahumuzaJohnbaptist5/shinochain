@@ -9,8 +9,6 @@ urlpatterns = [
     path("token/refresh", TokenRefreshView.as_view(), name="auth-token-refresh"),
 ]
 
-# /api/me is outside /api/auth/ prefix – added in the root urls alongside accounts
-from django.urls import path as _path  # noqa: E402, F811 – re-export for root urls
 me_urlpatterns = [
-    _path("me", MeView.as_view(), name="auth-me"),
+    path("me", MeView.as_view(), name="auth-me"),
 ]

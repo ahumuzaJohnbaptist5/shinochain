@@ -292,8 +292,7 @@ def index_video(self, video_id: str):
         raise self.retry(exc=exc)
 
     # Mark video ready only after the full pipeline (transcode + thumbnail + index) completes
-    from videos.models import Video as _Video  # noqa: F811
-    _Video.objects.filter(pk=video_id).update(status=_Video.STATUS_READY)
+    Video.objects.filter(pk=video_id).update(status=Video.STATUS_READY)
     logger.info("index_video: indexed and marked ready %s", video_id)
 
 
