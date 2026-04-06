@@ -4,6 +4,19 @@ from rest_framework.views import APIView
 
 from .models import AnalyticsEvent
 
+import logging
+import uuid as _uuid
+
+logger = logging.getLogger(__name__)
+
+
+def _is_valid_uuid(value):
+    try:
+        _uuid.UUID(str(value))
+        return True
+    except (ValueError, AttributeError):
+        return False
+
 
 class BatchEventView(APIView):
     """Ingest a batch of analytics events in a single request."""
@@ -25,10 +38,12 @@ class BatchEventView(APIView):
 
         to_create = []
         for item in events_data:
+            raw_video_id = item.get("video")
+            video_id = raw_video_id if _is_valid_uuid(raw_video_id) else None
             to_create.append(
                 AnalyticsEvent(
                     user=request.user,
-                    video_id=item.get("video"),
+                    video_id=video_id,
                     event_type=item.get("event_type", ""),
                     payload=item.get("payload", {}),
                 )

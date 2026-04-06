@@ -1,6 +1,9 @@
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import F, Value
+from django.db.models.functions import Greatest
 from rest_framework import generics, permissions, status
+from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -20,7 +23,7 @@ class LikeView(APIView):
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         _, created = Like.objects.get_or_create(user=request.user, video=video)
         if created:
-            Video.objects.filter(pk=pk).update(likes_count=video.likes_count + 1)
+            Video.objects.filter(pk=pk).update(likes_count=F("likes_count") + 1)
         return Response({"liked": True}, status=status.HTTP_200_OK)
 
     def delete(self, request, pk):
@@ -30,7 +33,7 @@ class LikeView(APIView):
         deleted, _ = Like.objects.filter(user=request.user, video=video).delete()
         if deleted:
             Video.objects.filter(pk=pk).update(
-                likes_count=max(0, video.likes_count - 1)
+                likes_count=Greatest(F("likes_count") - 1, Value(0))
             )
         return Response({"liked": False}, status=status.HTTP_200_OK)
 
@@ -45,14 +48,12 @@ class CommentListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         video = Video.objects.filter(pk=self.kwargs["pk"]).first()
         if video is None:
-            from rest_framework.exceptions import NotFound
             raise NotFound("Video not found.")
         with transaction.atomic():
-            comment = serializer.save(user=self.request.user, video=video)
+            serializer.save(user=self.request.user, video=video)
             Video.objects.filter(pk=self.kwargs["pk"]).update(
-                comments_count=video.comments_count + 1
+                comments_count=F("comments_count") + 1
             )
-        return comment
 
 
 class FollowView(APIView):
@@ -71,10 +72,10 @@ class FollowView(APIView):
         )
         if created:
             User.objects.filter(pk=pk).update(
-                followers_count=target.followers_count + 1
+                followers_count=F("followers_count") + 1
             )
             User.objects.filter(pk=request.user.pk).update(
-                following_count=request.user.following_count + 1
+                following_count=F("following_count") + 1
             )
         return Response({"following": True}, status=status.HTTP_200_OK)
 
@@ -87,9 +88,9 @@ class FollowView(APIView):
         ).delete()
         if deleted:
             User.objects.filter(pk=pk).update(
-                followers_count=max(0, target.followers_count - 1)
+                followers_count=Greatest(F("followers_count") - 1, Value(0))
             )
             User.objects.filter(pk=request.user.pk).update(
-                following_count=max(0, request.user.following_count - 1)
+                following_count=Greatest(F("following_count") - 1, Value(0))
             )
         return Response({"following": False}, status=status.HTTP_200_OK)

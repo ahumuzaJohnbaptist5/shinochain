@@ -200,8 +200,7 @@ def transcode_video(self, video_id: str):
 
     manifest_url = _public_url(f"{hls_prefix}/master.m3u8")
     video.hls_manifest_url = manifest_url
-    video.status = Video.STATUS_READY
-    video.save(update_fields=["hls_manifest_url", "status"])
+    video.save(update_fields=["hls_manifest_url"])
     logger.info("transcode_video: completed for %s → %s", video_id, manifest_url)
 
 
@@ -292,19 +291,21 @@ def index_video(self, video_id: str):
         logger.exception("index_video: Meilisearch error for %s", video_id)
         raise self.retry(exc=exc)
 
-    logger.info("index_video: indexed %s", video_id)
+    # Mark video ready only after the full pipeline (transcode + thumbnail + index) completes
+    from videos.models import Video as _Video  # noqa: F811
+    _Video.objects.filter(pk=video_id).update(status=_Video.STATUS_READY)
+    logger.info("index_video: indexed and marked ready %s", video_id)
 
 
 @shared_task
 def process_video(video_id: str):
     """
     Entry point: chains transcode → thumbnail → index.
-    transcode_video sets status=ready on success; the chain continues.
+    index_video sets status=ready on success at the end of the pipeline.
     """
-    workflow = chain(
+    chain(
         transcode_video.si(video_id),
         generate_thumbnail.si(video_id),
         index_video.si(video_id),
-    )
-    workflow.delay()
+    ).apply_async()
     logger.info("process_video: enqueued pipeline for %s", video_id)

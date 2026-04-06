@@ -1,8 +1,8 @@
 import uuid
+import logging
 import boto3
 from botocore.config import Config
 from django.conf import settings
-from django.db.models import Q
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -12,6 +12,8 @@ import meilisearch
 from .models import Video
 from .serializers import PublishVideoSerializer, VideoSerializer
 from worker.tasks import process_video
+
+logger = logging.getLogger(__name__)
 
 
 def _s3_client():
@@ -25,15 +27,28 @@ def _s3_client():
     )
 
 
+_ALLOWED_CONTENT_TYPES = {
+    "video/mp4": "mp4",
+    "video/quicktime": "mov",
+    "video/x-msvideo": "avi",
+    "video/webm": "webm",
+}
+
+
 class PresignedUploadView(APIView):
     """Return a presigned PUT URL for direct browser-to-R2 upload."""
 
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        ext = request.data.get("content_type", "video/mp4").split("/")[-1]
-        key = f"uploads/{request.user.id}/{uuid.uuid4()}.{ext}"
         content_type = request.data.get("content_type", "video/mp4")
+        ext = _ALLOWED_CONTENT_TYPES.get(content_type)
+        if ext is None:
+            return Response(
+                {"detail": f"Unsupported content_type. Allowed: {', '.join(_ALLOWED_CONTENT_TYPES)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        key = f"uploads/{request.user.id}/{uuid.uuid4()}.{ext}"
         try:
             client = _s3_client()
             url = client.generate_presigned_url(
@@ -45,8 +60,9 @@ class PresignedUploadView(APIView):
                 },
                 ExpiresIn=3600,
             )
-        except Exception as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+        except Exception:
+            logger.exception("Failed to generate presigned URL for user %s", request.user.id)
+            return Response({"detail": "Could not generate upload URL."}, status=status.HTTP_502_BAD_GATEWAY)
         return Response({"upload_url": url, "key": key})
 
 
@@ -90,7 +106,8 @@ class FeedView(generics.ListAPIView):
         items = serializer.data
         next_cursor = None
         if len(items) == 20:
-            next_cursor = str(qs.last().created_at.isoformat())
+            last = qs.last()
+            next_cursor = last.created_at.isoformat() if last else None
         return Response({"results": items, "next_cursor": next_cursor})
 
 
@@ -106,6 +123,7 @@ class SearchView(APIView):
                 settings.MEILISEARCH_URL, settings.MEILISEARCH_MASTER_KEY
             )
             results = client.index("videos").search(q, {"limit": 20})
-        except Exception as exc:
-            return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+        except Exception:
+            logger.exception("Meilisearch search error")
+            return Response({"detail": "Search service unavailable."}, status=status.HTTP_502_BAD_GATEWAY)
         return Response(results)
