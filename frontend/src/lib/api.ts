@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
+const BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000') + '/api';
 
 export const api = axios.create({
   baseURL: BASE_URL,
@@ -46,16 +46,17 @@ api.interceptors.request.use((config) => {
 // Auth
 // ---------------------------------------------------------------------------
 export interface AuthResponse {
-  access_token: string;
-  token_type: string;
+  access: string;
+  refresh: string;
 }
 
 export async function register(
   email: string,
   username: string,
   password: string,
-): Promise<void> {
-  await api.post('/auth/register', { email, username, password });
+): Promise<AuthResponse> {
+  const { data } = await api.post<AuthResponse>('/auth/register', { email, username, password });
+  return data;
 }
 
 export async function login(
@@ -83,7 +84,7 @@ export interface User {
 }
 
 export async function getMe(): Promise<User> {
-  const { data } = await api.get<User>('/users/me');
+  const { data } = await api.get<User>('/me');
   return data;
 }
 
@@ -100,14 +101,14 @@ export async function unfollowUser(userId: string): Promise<void> {
 // ---------------------------------------------------------------------------
 export interface PresignedUrlResponse {
   upload_url: string;
-  object_key: string;
+  key: string;
 }
 
 export async function getPresignedUrl(
   filename: string,
   contentType: string,
 ): Promise<PresignedUrlResponse> {
-  const { data } = await api.post<PresignedUrlResponse>('/videos/presigned-url', {
+  const { data } = await api.post<PresignedUrlResponse>('/uploads/video', {
     filename,
     content_type: contentType,
   });
@@ -115,9 +116,10 @@ export async function getPresignedUrl(
 }
 
 export interface PublishVideoPayload {
-  object_key: string;
+  upload_key: string;
   caption: string;
   hashtags: string[];
+  duration?: number;
 }
 
 export interface Video {
@@ -128,8 +130,11 @@ export interface Video {
   thumbnail_url: string;
   likes_count: number;
   comments_count: number;
-  is_liked: boolean;
-  user: Pick<User, 'id' | 'username' | 'avatar_url'>;
+  views_count: number;
+  // VideoSerializer exposes username/avatar_url flat (not nested user object)
+  username: string;
+  avatar_url?: string;
+  status: string;
   created_at: string;
 }
 

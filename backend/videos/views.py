@@ -108,7 +108,7 @@ class FeedView(generics.ListAPIView):
         if len(items) == 20:
             last = qs.last()
             next_cursor = last.created_at.isoformat() if last else None
-        return Response({"results": items, "next_cursor": next_cursor})
+        return Response({"videos": items, "next_cursor": next_cursor})
 
 
 class SearchView(APIView):

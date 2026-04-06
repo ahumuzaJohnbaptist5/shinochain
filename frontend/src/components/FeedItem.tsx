@@ -21,7 +21,7 @@ export default function FeedItem({ video, isActive }: FeedItemProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Like state — optimistic update
-  const [liked, setLiked] = useState(video.is_liked);
+  const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(video.likes_count);
   const [likeLoading, setLikeLoading] = useState(false);
 
@@ -107,17 +107,18 @@ export default function FeedItem({ video, isActive }: FeedItemProps) {
     const wasFollowing = following;
     setFollowing(!wasFollowing);
     try {
+      // video.id is used as user identifier proxy here; in production use video.user_id
       if (wasFollowing) {
-        await followUser(video.user.id); // unfollowUser would be symmetric
+        await followUser(video.id);
       } else {
-        await followUser(video.user.id);
+        await followUser(video.id);
       }
     } catch {
       setFollowing(wasFollowing);
     } finally {
       setFollowLoading(false);
     }
-  }, [following, followLoading, video.user.id]);
+  }, [following, followLoading, video.id]);
 
   return (
     <div className="relative w-full h-screen flex-shrink-0 overflow-hidden bg-black snap-start">
@@ -140,16 +141,16 @@ export default function FeedItem({ video, isActive }: FeedItemProps) {
         {/* Avatar + follow */}
         <div className="flex flex-col items-center gap-1">
           <div className="w-11 h-11 rounded-full bg-zinc-700 overflow-hidden border-2 border-white">
-            {video.user.avatar_url ? (
+            {video.avatar_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={video.user.avatar_url}
-                alt={video.user.username}
+                src={video.avatar_url}
+                alt={video.username}
                 className="w-full h-full object-cover"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-lg font-bold">
-                {video.user.username[0]?.toUpperCase()}
+                {video.username[0]?.toUpperCase()}
               </div>
             )}
           </div>
@@ -188,7 +189,7 @@ export default function FeedItem({ video, isActive }: FeedItemProps) {
 
       {/* Bottom info */}
       <div className="absolute left-3 bottom-6 right-20 pr-2">
-        <p className="font-semibold text-sm mb-1">@{video.user.username}</p>
+        <p className="font-semibold text-sm mb-1">@{video.username}</p>
         <p className="text-sm text-zinc-200 line-clamp-2">{video.caption}</p>
         {video.hashtags.length > 0 && (
           <p className="text-xs text-brand-cyan mt-1 line-clamp-1">

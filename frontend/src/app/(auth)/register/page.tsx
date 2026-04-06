@@ -18,10 +18,8 @@ export default function RegisterPage() {
     setError(null);
     setLoading(true);
     try {
-      await register(email, username, password);
-      // Auto-login after registration
-      const { access_token } = await login(email, password);
-      saveToken(access_token);
+      const { access } = await register(email, username, password);
+      saveToken(access);
       router.push('/');
     } catch (err: unknown) {
       const message =

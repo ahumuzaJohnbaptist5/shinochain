@@ -17,8 +17,8 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      const { access_token } = await login(email, password);
-      saveToken(access_token);
+      const { access } = await login(email, password);
+      saveToken(access);
       router.push('/');
     } catch (err: unknown) {
       const message =

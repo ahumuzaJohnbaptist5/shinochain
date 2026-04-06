@@ -34,7 +34,7 @@ export default function UploadPage() {
     setStep('upload');
     setUploadProgress(0);
     try {
-      const { upload_url, object_key } = await getPresignedUrl(
+      const { upload_url, key } = await getPresignedUrl(
         selected.name,
         selected.type,
       );
@@ -48,7 +48,7 @@ export default function UploadPage() {
           }
         },
       });
-      setObjectKey(object_key);
+      setObjectKey(key);
       setStep('details');
     } catch {
       setError('Upload failed. Please try again.');
@@ -66,7 +66,7 @@ export default function UploadPage() {
         .split(/[\s,#]+/)
         .map((t) => t.trim().toLowerCase())
         .filter(Boolean);
-      await publishVideo({ object_key: objectKey, caption, hashtags });
+      await publishVideo({ upload_key: objectKey, caption, hashtags });
       router.push('/');
     } catch {
       setError('Failed to publish. Please try again.');
